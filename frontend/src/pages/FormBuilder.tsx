@@ -36,6 +36,7 @@ export default function FormBuilder() {
           name: 'New Form',
           fields: [],
           columns: [{ id: uuidv4(), name: 'Main Column', width: 100, fieldIds: [] }],
+          sections: [],
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -77,6 +78,7 @@ export default function FormBuilder() {
       name: finalFormName,
       fields: state.currentForm.fields,
       columns: state.currentForm.columns,
+      sections: state.currentForm.sections || [],
     };
 
     // Validate form data before sending
@@ -97,9 +99,9 @@ export default function FormBuilder() {
         // Create new form (first time saving)
         const newId = await formApi.createForm(formData);
         // Update the current form with the new ID from the database
-        dispatch({ 
-          type: 'SET_CURRENT_FORM', 
-          payload: { ...state.currentForm, id: newId, name: finalFormName } 
+        dispatch({
+          type: 'SET_CURRENT_FORM',
+          payload: { ...state.currentForm, id: newId, name: finalFormName }
         });
         setFormName(finalFormName);
         navigate(`/builder/${newId}`);
@@ -145,7 +147,7 @@ export default function FormBuilder() {
     const draggedField = fields[dragIndex];
     fields.splice(dragIndex, 1);
     fields.splice(hoverIndex, 0, draggedField);
-    
+
     if (state.currentForm) {
       dispatch({
         type: 'SET_CURRENT_FORM',
@@ -156,18 +158,18 @@ export default function FormBuilder() {
 
   const handleFieldDropToColumn = (fieldId: string, columnId: string) => {
     if (!state.currentForm) return;
-    
+
     // Update the field to assign it to the column
     const updatedFields = state.currentForm.fields.map(field =>
       field.id === fieldId ? { ...field, columnId } : field
     );
-    
+
     // Update the column to include this field
     const updatedColumns = state.currentForm.columns.map(column => {
       if (column.id === columnId) {
         // Add field to this column if not already there
-        const fieldIds = column.fieldIds.includes(fieldId) 
-          ? column.fieldIds 
+        const fieldIds = column.fieldIds.includes(fieldId)
+          ? column.fieldIds
           : [...column.fieldIds, fieldId];
         return { ...column, fieldIds };
       } else {
@@ -175,11 +177,11 @@ export default function FormBuilder() {
         return { ...column, fieldIds: column.fieldIds.filter(id => id !== fieldId) };
       }
     });
-    
+
     dispatch({
       type: 'SET_CURRENT_FORM',
-      payload: { 
-        ...state.currentForm, 
+      payload: {
+        ...state.currentForm,
         fields: updatedFields,
         columns: updatedColumns
       },
@@ -188,7 +190,7 @@ export default function FormBuilder() {
 
   const [, drop] = useDrop({
     accept: 'field',
-    drop: () => {},
+    drop: () => { },
   });
 
   if (state.loading) {
@@ -233,7 +235,7 @@ export default function FormBuilder() {
               📎 File Upload
             </button>
           </div>
-          
+
           <div className="mt-6">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-medium">Columns</h4>
@@ -330,7 +332,7 @@ export default function FormBuilder() {
                 {state.currentForm.columns.map((column: FormColumn) => {
                   const fieldsInColumn = state.currentForm?.fields.filter(field => field.columnId === column.id) || [];
                   if (fieldsInColumn.length === 0) return null;
-                  
+
                   return (
                     <div key={column.id} className="border-2 border-dashed border-blue-200 rounded-lg p-4">
                       <h4 className="text-sm font-semibold text-blue-700 mb-3 flex items-center">
@@ -378,12 +380,12 @@ export default function FormBuilder() {
                     </div>
                   );
                 })}
-                
+
                 {/* Show unassigned fields */}
                 {(() => {
                   const unassignedFields = state.currentForm?.fields.filter(field => !field.columnId) || [];
                   if (unassignedFields.length === 0) return null;
-                  
+
                   return (
                     <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
                       <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center">
@@ -452,7 +454,7 @@ export default function FormBuilder() {
             onClose={() => setSelectedField(null)}
           />
         )}
-        
+
         {showColumnEditor && selectedColumn && (
           <ColumnEditor
             column={selectedColumn}

@@ -11,9 +11,10 @@ interface FormRendererProps {
   onChange?: (value: any) => void;
   error?: string;
   preview?: boolean;
+  onConditionalTrigger?: (targetSectionId: string) => void;
 }
 
-export default function FormRenderer({ field, value, onChange, error, preview = false }: FormRendererProps) {
+export default function FormRenderer({ field, value, onChange, error, preview = false, onConditionalTrigger }: FormRendererProps) {
   switch (field.type) {
     case 'text':
       return (
@@ -34,6 +35,7 @@ export default function FormRenderer({ field, value, onChange, error, preview = 
           onChange={onChange}
           error={error}
           preview={preview}
+          onConditionalTrigger={onConditionalTrigger}
         />
       );
     

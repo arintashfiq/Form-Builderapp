@@ -19,17 +19,35 @@ const formSchema = Joi.object({
         question: Joi.string().required(),
         required: Joi.boolean().required(),
         columnId: Joi.string().optional(),
+        sectionId: Joi.string().optional(),
         validation: Joi.object().optional(),
         options: Joi.array().optional(),
         tableColumns: Joi.array().optional(),
-        conditionalLogic: Joi.array().optional()
+        conditionalLogic: Joi.object({
+            conditions: Joi.array().items(Joi.object({
+                answer: Joi.string().required(),
+                targetSectionId: Joi.string().required()
+            }))
+        }).optional()
     })).required(),
     columns: Joi.array().items(Joi.object({
         id: Joi.string().required(),
         name: Joi.string().required(),
         width: Joi.number().required(),
         fieldIds: Joi.array().items(Joi.string()).required()
-    })).required()
+    })).required(),
+    sections: Joi.array().items(Joi.object({
+        id: Joi.string().required(),
+        title: Joi.string().required(),
+        description: Joi.string().optional().allow(''),
+        order: Joi.number().required(),
+        columns: Joi.array().items(Joi.object({
+            id: Joi.string().required(),
+            name: Joi.string().required(),
+            width: Joi.number().required(),
+            fieldIds: Joi.array().items(Joi.string()).required()
+        })).optional()
+    })).optional().default([])
 });
 
 const submissionSchema = Joi.object({
@@ -68,7 +86,8 @@ router.get('/:id', async (req: Request, res: Response) => {
         const form = {
             ...forms[0],
             fields: typeof forms[0].fields === 'string' ? JSON.parse(forms[0].fields) : forms[0].fields,
-            columns: typeof forms[0].columns === 'string' ? JSON.parse(forms[0].columns) : forms[0].columns
+            columns: typeof forms[0].columns === 'string' ? JSON.parse(forms[0].columns) : forms[0].columns,
+            sections: forms[0].sections ? (typeof forms[0].sections === 'string' ? JSON.parse(forms[0].sections) : forms[0].sections) : []
         };
 
         const response: ApiResponse<Form> = { success: true, data: form };

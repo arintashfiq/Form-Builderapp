@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { Form, FormField, FormColumn } from '../types';
+import { Form, FormField, FormColumn, FormSection } from '../types';
 
 interface FormState {
   currentForm: Form | null;
@@ -19,7 +19,12 @@ type FormAction =
   | { type: 'ADD_COLUMN'; payload: FormColumn }
   | { type: 'UPDATE_COLUMN'; payload: { id: string; column: Partial<FormColumn> } }
   | { type: 'DELETE_COLUMN'; payload: string }
-  | { type: 'MOVE_FIELD_TO_COLUMN'; payload: { fieldId: string; columnId: string } };
+  | { type: 'MOVE_FIELD_TO_COLUMN'; payload: { fieldId: string; columnId: string } }
+  | { type: 'ADD_SECTION'; payload: FormSection }
+  | { type: 'UPDATE_SECTION'; payload: { id: string; section: Partial<FormSection> } }
+  | { type: 'DELETE_SECTION'; payload: string }
+  | { type: 'MOVE_FIELD_TO_SECTION'; payload: { fieldId: string; sectionId: string } }
+  | { type: 'REORDER_SECTIONS'; payload: FormSection[] };
 
 const initialState: FormState = {
   currentForm: null,
@@ -136,6 +141,69 @@ function formReducer(state: FormState, action: FormAction): FormState {
               ? [...column.fieldIds.filter(id => id !== action.payload.fieldId), action.payload.fieldId]
               : column.fieldIds.filter(id => id !== action.payload.fieldId),
           })),
+        },
+      };
+    
+    case 'ADD_SECTION':
+      if (!state.currentForm) return state;
+      return {
+        ...state,
+        currentForm: {
+          ...state.currentForm,
+          sections: [...state.currentForm.sections, action.payload],
+        },
+      };
+    
+    case 'UPDATE_SECTION':
+      if (!state.currentForm) return state;
+      return {
+        ...state,
+        currentForm: {
+          ...state.currentForm,
+          sections: state.currentForm.sections.map(section =>
+            section.id === action.payload.id
+              ? { ...section, ...action.payload.section }
+              : section
+          ),
+        },
+      };
+    
+    case 'DELETE_SECTION':
+      if (!state.currentForm) return state;
+      return {
+        ...state,
+        currentForm: {
+          ...state.currentForm,
+          sections: state.currentForm.sections.filter(section => section.id !== action.payload),
+          fields: state.currentForm.fields.map(field =>
+            field.sectionId === action.payload
+              ? { ...field, sectionId: undefined }
+              : field
+          ),
+        },
+      };
+    
+    case 'MOVE_FIELD_TO_SECTION':
+      if (!state.currentForm) return state;
+      return {
+        ...state,
+        currentForm: {
+          ...state.currentForm,
+          fields: state.currentForm.fields.map(field =>
+            field.id === action.payload.fieldId
+              ? { ...field, sectionId: action.payload.sectionId }
+              : field
+          ),
+        },
+      };
+    
+    case 'REORDER_SECTIONS':
+      if (!state.currentForm) return state;
+      return {
+        ...state,
+        currentForm: {
+          ...state.currentForm,
+          sections: action.payload,
         },
       };
 

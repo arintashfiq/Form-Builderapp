@@ -12,7 +12,7 @@ export default function FormPreview() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
+
 
   useEffect(() => {
     if (id) {
@@ -34,17 +34,17 @@ export default function FormPreview() {
 
   const validateForm = (): boolean => {
     if (!state.currentForm) return false;
-    
+
     const newErrors: Record<string, string> = {};
-    
+
     state.currentForm.fields.forEach(field => {
       const value = formData[field.id];
-      
+
       if (field.required && (!value || (Array.isArray(value) && value.length === 0))) {
         newErrors[field.id] = 'This field is required';
         return;
       }
-      
+
       if (field.type === 'text' && value) {
         if (field.validation?.minLength && value.length < field.validation.minLength) {
           newErrors[field.id] = `Minimum length is ${field.validation.minLength} characters`;
@@ -54,16 +54,16 @@ export default function FormPreview() {
         }
       }
     });
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm() || !id) return;
-    
+
     setIsSubmitting(true);
     try {
       await formApi.submitForm(id, formData);
@@ -77,38 +77,27 @@ export default function FormPreview() {
 
   const handleFieldChange = (fieldId: string, value: any) => {
     setFormData(prev => ({ ...prev, [fieldId]: value }));
-    
+
     // Clear error when user starts typing
     if (errors[fieldId]) {
       setErrors(prev => ({ ...prev, [fieldId]: '' }));
     }
-    
-    // Handle conditional logic
-    const field = state.currentForm?.fields.find(f => f.id === fieldId);
-    if (field?.type === 'dropdown' && field.conditionalLogic) {
-      field.conditionalLogic.forEach(rule => {
-        if (rule.condition === value && rule.action === 'jump') {
-          const targetIndex = state.currentForm?.fields.findIndex(f => f.id === rule.targetFieldId);
-          if (targetIndex !== undefined && targetIndex !== -1) {
-            setCurrentStep(targetIndex);
-          }
-        }
-      });
-    }
+
+    // TODO: Handle conditional logic (to be implemented later)
   };
 
   const getVisibleFields = () => {
     if (!state.currentForm) return [];
-    
+
     // For now, show all fields. In a full implementation, you'd handle conditional logic here
     return state.currentForm.fields;
   };
 
   const renderFormColumns = () => {
     if (!state.currentForm) return null;
-    
+
     const visibleFields = getVisibleFields();
-    
+
     if (state.currentForm.columns.length <= 1) {
       // Single column layout
       return (
@@ -126,7 +115,7 @@ export default function FormPreview() {
         </div>
       );
     }
-    
+
     // Multi-column layout
     return (
       <div className="grid gap-6" style={{ gridTemplateColumns: state.currentForm.columns.map(col => `${col.width}fr`).join(' ') }}>
@@ -138,7 +127,7 @@ export default function FormPreview() {
             {column.fieldIds.map(fieldId => {
               const field = visibleFields.find(f => f.id === fieldId);
               if (!field) return null;
-              
+
               return (
                 <FormRenderer
                   key={field.id}
@@ -152,7 +141,7 @@ export default function FormPreview() {
             })}
           </div>
         ))}
-        
+
         {/* Fields not assigned to any column */}
         <div className="space-y-6">
           {visibleFields
@@ -248,7 +237,7 @@ export default function FormPreview() {
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border p-8">
         {renderFormColumns()}
-        
+
         <div className="mt-8 pt-6 border-t">
           <button
             type="submit"

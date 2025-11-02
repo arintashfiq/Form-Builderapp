@@ -7,11 +7,27 @@ interface DropdownFieldProps {
   onChange?: (value: string) => void;
   error?: string;
   preview?: boolean;
+  onConditionalTrigger?: (targetSectionId: string) => void;
 }
 
-export default function DropdownField({ field, value = '', onChange, error, preview = false }: DropdownFieldProps) {
+export default function DropdownField({ field, value = '', onChange, error, preview = false, onConditionalTrigger }: DropdownFieldProps) {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onChange?.(e.target.value);
+    const newValue = e.target.value;
+    onChange?.(newValue);
+    
+    // Handle conditional logic if in preview mode
+    if (preview && field.conditionalLogic && newValue) {
+      const matchingCondition = field.conditionalLogic.conditions.find(
+        condition => condition.answer === newValue
+      );
+      
+      if (matchingCondition && onConditionalTrigger) {
+        // Small delay to allow the value to be set first
+        setTimeout(() => {
+          onConditionalTrigger(matchingCondition.targetSectionId);
+        }, 100);
+      }
+    }
   };
 
   const validateInput = (inputValue: string): string | undefined => {
@@ -28,6 +44,11 @@ export default function DropdownField({ field, value = '', onChange, error, prev
       <label className="block text-sm font-medium text-gray-700">
         {field.question}
         {field.required && <span className="text-red-500 ml-1">*</span>}
+        {field.conditionalLogic && field.conditionalLogic.conditions.length > 0 && (
+          <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+            Has Logic
+          </span>
+        )}
       </label>
       
       <select

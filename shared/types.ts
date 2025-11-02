@@ -6,13 +6,14 @@ export interface FormField {
   question: string;
   required: boolean;
   columnId?: string;
+  sectionId?: string;
   validation?: {
     minLength?: number;
     maxLength?: number;
   };
   options?: string[];
   tableColumns?: TableColumn[];
-  conditionalLogic?: ConditionalRule[];
+  conditionalLogic?: ConditionalLogic;
 }
 
 export interface TableColumn {
@@ -22,10 +23,13 @@ export interface TableColumn {
   options?: string[];
 }
 
+export interface ConditionalLogic {
+  conditions: ConditionalRule[];
+}
+
 export interface ConditionalRule {
-  condition: string;
-  targetFieldId: string;
-  action: 'show' | 'hide' | 'jump';
+  answer: string;
+  targetSectionId: string; // or "end" for form completion
 }
 
 export interface FormColumn {
@@ -35,11 +39,20 @@ export interface FormColumn {
   fieldIds: string[];
 }
 
+export interface FormSection {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  columns?: FormColumn[]; // Columns are now part of sections
+}
+
 export interface Form {
   id: string;
   name: string;
   fields: FormField[];
   columns: FormColumn[];
+  sections: FormSection[];
   createdAt: Date;
   updatedAt: Date;
 }

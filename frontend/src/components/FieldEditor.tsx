@@ -245,13 +245,27 @@ export default function FieldEditor({ field, onUpdate, onClose }: FieldEditorPro
                     <div className="mt-2">
                       <input
                         type="text"
-                        placeholder="Options (comma separated)"
+                        placeholder="Options (comma separated, e.g., Yes, No, Maybe)"
                         value={column.options?.join(', ') || ''}
-                        onChange={(e) => updateTableColumn(index, { 
-                          options: e.target.value.split(',').map((opt: string) => opt.trim()).filter(Boolean)
-                        })}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Split by comma and trim, but keep empty strings during typing
+                          const options = value.split(',').map((opt: string) => opt.trim());
+                          updateTableColumn(index, { options });
+                        }}
+                        onBlur={(e) => {
+                          // On blur, clean up empty options
+                          const value = e.target.value;
+                          const options = value.split(',').map((opt: string) => opt.trim()).filter(Boolean);
+                          if (options.length > 0) {
+                            updateTableColumn(index, { options });
+                          }
+                        }}
                         className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Separate options with commas
+                      </p>
                     </div>
                   )}
                 </div>
