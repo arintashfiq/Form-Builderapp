@@ -15,13 +15,28 @@ export default function DropdownField({ field, value = '', onChange, error, prev
     const newValue = e.target.value;
     onChange?.(newValue);
     
+    console.log('Dropdown changed:', {
+      fieldId: field.id,
+      question: field.question,
+      newValue,
+      hasConditionalLogic: !!field.conditionalLogic,
+      conditions: field.conditionalLogic?.conditions || [],
+      preview
+    });
+    
     // Handle conditional logic if in preview mode
     if (preview && field.conditionalLogic && newValue) {
       const matchingCondition = field.conditionalLogic.conditions.find(
         condition => condition.answer === newValue
       );
       
+      console.log('Conditional logic check:', {
+        matchingCondition,
+        hasOnConditionalTrigger: !!onConditionalTrigger
+      });
+      
       if (matchingCondition && onConditionalTrigger) {
+        console.log('Triggering conditional navigation to:', matchingCondition.targetSectionId);
         // Small delay to allow the value to be set first
         setTimeout(() => {
           onConditionalTrigger(matchingCondition.targetSectionId);

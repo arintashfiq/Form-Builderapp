@@ -1,20 +1,25 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { FormField, TableColumn } from '../types';
+import { FormField, TableColumn, FormSection, ConditionalRule } from '../types';
+import ConditionalLogicEditor from './ConditionalLogicEditor';
 
 interface FieldEditorProps {
   field: FormField;
   onUpdate: (updates: Partial<FormField>) => void;
   onClose: () => void;
+  sections?: FormSection[];
 }
 
-export default function FieldEditor({ field, onUpdate, onClose }: FieldEditorProps) {
+export default function FieldEditor({ field, onUpdate, onClose, sections = [] }: FieldEditorProps) {
   const [question, setQuestion] = useState(field.question);
   const [required, setRequired] = useState(field.required);
   const [minLength, setMinLength] = useState(field.validation?.minLength || '');
   const [maxLength, setMaxLength] = useState(field.validation?.maxLength || '');
   const [options, setOptions] = useState(field.options || []);
   const [tableColumns, setTableColumns] = useState(field.tableColumns || []);
+  const [conditionalRules, setConditionalRules] = useState<ConditionalRule[]>(
+    field.conditionalLogic?.conditions || []
+  );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const markAsChanged = () => {
@@ -29,7 +34,10 @@ export default function FieldEditor({ field, onUpdate, onClose }: FieldEditorPro
         ...(minLength && { minLength: parseInt(minLength.toString()) }),
         ...(maxLength && { maxLength: parseInt(maxLength.toString()) }),
       } : undefined,
-      ...(field.type === 'dropdown' && { options }),
+      ...(field.type === 'dropdown' && { 
+        options,
+        conditionalLogic: conditionalRules.length > 0 ? { conditions: conditionalRules } : undefined
+      }),
       ...(field.type === 'table' && { tableColumns }),
     };
     onUpdate(updates);
@@ -44,6 +52,7 @@ export default function FieldEditor({ field, onUpdate, onClose }: FieldEditorPro
     setMaxLength(field.validation?.maxLength || '');
     setOptions(field.options || []);
     setTableColumns(field.tableColumns || []);
+    setConditionalRules(field.conditionalLogic?.conditions || []);
     setHasUnsavedChanges(false);
   };
 
@@ -199,6 +208,33 @@ export default function FieldEditor({ field, onUpdate, onClose }: FieldEditorPro
                   </button>
                 </div>
               ))}
+            </div>
+
+            {/* Conditional Logic for Dropdown */}
+            <div className="mt-4 pt-4 border-t">
+              <div className="text-xs text-gray-500 mb-2">
+                Debug: {sections.length} sections available
+                {sections.length > 0 && (
+                  <span> - {sections.map(s => s.title).join(', ')}</span>
+                )}
+              </div>
+              {sections.length > 1 ? (
+                <ConditionalLogicEditor
+                  options={options}
+                  rules={conditionalRules}
+                  sections={sections}
+                  onChange={(rules) => {
+                    setConditionalRules(rules);
+                    markAsChanged();
+                  }}
+                />
+              ) : (
+                <div className="text-sm text-gray-500 italic">
+                  Add more sections to enable conditional logic. 
+                  <br />
+                  <span className="text-xs">Conditional logic allows dropdown answers to navigate to different sections.</span>
+                </div>
+              )}
             </div>
           </div>
         )}

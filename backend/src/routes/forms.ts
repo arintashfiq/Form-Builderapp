@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import Joi from 'joi';
 import { pool } from '../database';
-import { Form, FormSubmission, ApiResponse } from '../types';
+import { Form, FormSubmission, ApiResponse } from '../../../shared/types';
 
 const router = Router();
 
@@ -109,11 +109,11 @@ router.post('/', async (req: Request, res: Response) => {
         }
 
         const id = uuidv4();
-        const { name, fields, columns } = value;
+        const { name, fields, columns, sections } = value;
 
         await pool.execute(
-            'INSERT INTO forms (id, name, fields, columns) VALUES (?, ?, ?, ?)',
-            [id, name, JSON.stringify(fields), JSON.stringify(columns)]
+            'INSERT INTO forms (id, name, fields, columns, sections) VALUES (?, ?, ?, ?, ?)',
+            [id, name, JSON.stringify(fields), JSON.stringify(columns), JSON.stringify(sections || [])]
         );
 
         console.log('Form created successfully with ID:', id);
@@ -121,7 +121,8 @@ router.post('/', async (req: Request, res: Response) => {
         res.status(201).json(response);
     } catch (error) {
         console.error('Error creating form:', error);
-        res.status(500).json({ success: false, error: 'Failed to create form' });
+        console.error('Error details:', error);
+        res.status(500).json({ success: false, error: 'Failed to create form: ' + (error as Error).message });
     }
 });
 
@@ -133,11 +134,11 @@ router.put('/:id', async (req: Request, res: Response) => {
             return res.status(400).json({ success: false, error: error.details[0].message });
         }
 
-        const { name, fields, columns } = value;
+        const { name, fields, columns, sections } = value;
 
         const [result] = await pool.execute(
-            'UPDATE forms SET name = ?, fields = ?, columns = ? WHERE id = ?',
-            [name, JSON.stringify(fields), JSON.stringify(columns), req.params.id]
+            'UPDATE forms SET name = ?, fields = ?, columns = ?, sections = ? WHERE id = ?',
+            [name, JSON.stringify(fields), JSON.stringify(columns), JSON.stringify(sections || []), req.params.id]
         );
 
         if ((result as any).affectedRows === 0) {
@@ -148,7 +149,8 @@ router.put('/:id', async (req: Request, res: Response) => {
         res.json(response);
     } catch (error) {
         console.error('Error updating form:', error);
-        res.status(500).json({ success: false, error: 'Failed to update form' });
+        console.error('Error details:', error);
+        res.status(500).json({ success: false, error: 'Failed to update form: ' + (error as Error).message });
     }
 });
 
@@ -173,7 +175,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 router.post('/:id/submit', async (req: Request, res: Response) => {
     try {
         console.log('Submitting form:', req.params.id, 'with data:', JSON.stringify(req.body, null, 2));
-        
+
         // First check if the form exists
         const [formRows] = await pool.execute('SELECT id FROM forms WHERE id = ?', [req.params.id]);
         if ((formRows as any[]).length === 0) {

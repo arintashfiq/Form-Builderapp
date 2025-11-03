@@ -4,6 +4,7 @@ import { ArrowLeft, Send } from 'lucide-react';
 import { useForm } from '../contexts/FormContext';
 import { formApi } from '../services/api';
 import FormRenderer from '../components/FormRenderer';
+import SectionNavigation from '../components/SectionNavigation';
 
 export default function FormPreview() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function FormPreview() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
 
 
   useEffect(() => {
@@ -83,25 +85,116 @@ export default function FormPreview() {
       setErrors(prev => ({ ...prev, [fieldId]: '' }));
     }
 
-    // TODO: Handle conditional logic (to be implemented later)
+    // Handle conditional logic for dropdown fields
+    const field = state.currentForm?.fields.find(f => f.id === fieldId);
+    if (field?.type === 'dropdown' && field.conditionalLogic && value) {
+      const matchingRule = field.conditionalLogic.conditions.find(rule => rule.answer === value);
+      if (matchingRule) {
+        console.log('Auto-navigating due to conditional logic:', matchingRule.targetSectionId);
+        // Small delay to ensure the value is set
+        setTimeout(() => {
+          handleConditionalTrigger(matchingRule.targetSectionId);
+        }, 100);
+      }
+    }
+  };
+
+  const handleConditionalTrigger = (targetSectionId: string) => {
+    console.log('Conditional trigger:', targetSectionId);
+    if (targetSectionId === 'end') {
+      handleSubmit(new Event('submit') as any);
+    } else {
+      const targetIndex = state.currentForm?.sections?.findIndex(s => s.id === targetSectionId);
+      if (targetIndex !== undefined && targetIndex !== -1) {
+        setCurrentSectionIndex(targetIndex);
+      }
+    }
   };
 
   const getVisibleFields = () => {
     if (!state.currentForm) return [];
 
-    // For now, show all fields. In a full implementation, you'd handle conditional logic here
-    return state.currentForm.fields;
+    // Check if form has sections
+    const hasSections = state.currentForm.sections && state.currentForm.sections.length > 0;
+    
+    if (!hasSections) {
+      // No sections: show all fields
+      return state.currentForm.fields;
+    }
+
+    // Has sections: show current section's fields
+    const currentSection = state.currentForm.sections[currentSectionIndex];
+    if (!currentSection) {
+      return state.currentForm.fields; // Fallback to all fields
+    }
+
+    // Get fields for current section
+    let sectionFields = state.currentForm.fields.filter(f => f.sectionId === currentSection.id);
+    
+    // Fallback: if no fields match sectionId, show fields without sectionId in first section
+    if (sectionFields.length === 0 && currentSectionIndex === 0) {
+      sectionFields = state.currentForm.fields.filter(f => !f.sectionId);
+    }
+
+    return sectionFields;
+  };
+
+  const canProceedToNext = (): boolean => {
+    if (!state.currentForm) return false;
+
+    const visibleFields = getVisibleFields();
+    
+    // Check if all required fields are filled
+    const hasUnfilledRequired = visibleFields.some(field => {
+      if (!field.required) return false;
+      const value = formData[field.id];
+      return !value || (Array.isArray(value) && value.length === 0);
+    });
+
+    if (hasUnfilledRequired) {
+      return false;
+    }
+
+    // Check if there are dropdown fields with conditional logic that haven't been answered
+    const conditionalDropdowns = visibleFields.filter(field => 
+      field.type === 'dropdown' && 
+      field.conditionalLogic && 
+      field.conditionalLogic.conditions.length > 0
+    );
+
+    // If there are conditional dropdowns, user must select an option (no manual next)
+    const hasUnansweredConditional = conditionalDropdowns.some(field => {
+      const value = formData[field.id];
+      return !value; // Must have a value selected
+    });
+
+    return !hasUnansweredConditional;
   };
 
   const renderFormColumns = () => {
     if (!state.currentForm) return null;
 
     const visibleFields = getVisibleFields();
+    const hasSections = state.currentForm.sections && state.currentForm.sections.length > 0;
+    const currentSection = hasSections ? state.currentForm.sections[currentSectionIndex] : null;
+
+    const sectionHeader = hasSections && currentSection ? (
+      <div className="border-b pb-4 mb-6">
+        <h2 className="text-xl font-semibold text-gray-900">{currentSection.title}</h2>
+        {currentSection.description && (
+          <p className="text-gray-600 mt-2">{currentSection.description}</p>
+        )}
+        <div className="text-sm text-blue-600 mt-2">
+          Section {currentSectionIndex + 1} of {state.currentForm.sections.length}
+        </div>
+      </div>
+    ) : null;
 
     if (state.currentForm.columns.length <= 1) {
       // Single column layout
       return (
         <div className="space-y-6">
+          {sectionHeader}
           {visibleFields.map(field => (
             <FormRenderer
               key={field.id}
@@ -118,17 +211,17 @@ export default function FormPreview() {
 
     // Multi-column layout
     return (
-      <div className="grid gap-6" style={{ gridTemplateColumns: state.currentForm.columns.map(col => `${col.width}fr`).join(' ') }}>
+      <div className="space-y-6">
+        {sectionHeader}
+        <div className="grid gap-6" style={{ gridTemplateColumns: state.currentForm.columns.map(col => `${col.width}fr`).join(' ') }}>
         {state.currentForm.columns.map(column => (
           <div key={column.id} className="space-y-6">
             <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
               {column.name}
             </h3>
-            {column.fieldIds.map(fieldId => {
-              const field = visibleFields.find(f => f.id === fieldId);
-              if (!field) return null;
-
-              return (
+            {visibleFields
+              .filter(field => field.columnId === column.id)
+              .map(field => (
                 <FormRenderer
                   key={field.id}
                   field={field}
@@ -136,9 +229,9 @@ export default function FormPreview() {
                   onChange={(value) => handleFieldChange(field.id, value)}
                   error={errors[field.id]}
                   preview={true}
+                  onConditionalTrigger={handleConditionalTrigger}
                 />
-              );
-            })}
+              ))}
           </div>
         ))}
 
@@ -154,8 +247,10 @@ export default function FormPreview() {
                 onChange={(value) => handleFieldChange(field.id, value)}
                 error={errors[field.id]}
                 preview={true}
+                onConditionalTrigger={handleConditionalTrigger}
               />
             ))}
+        </div>
         </div>
       </div>
     );
@@ -235,29 +330,62 @@ export default function FormPreview() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border p-8">
-        {renderFormColumns()}
+      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <form onSubmit={handleSubmit} className="p-8">
+          {renderFormColumns()}
+        </form>
 
-        <div className="mt-8 pt-6 border-t">
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Submitting...
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4 mr-2" />
-                Submit Form
-              </>
-            )}
-          </button>
-        </div>
-      </form>
+        {/* Section Navigation */}
+        {state.currentForm.sections && state.currentForm.sections.length > 1 && (
+          <SectionNavigation
+            currentSection={currentSectionIndex}
+            totalSections={state.currentForm.sections.length}
+            canGoNext={canProceedToNext()}
+            canGoPrevious={currentSectionIndex > 0}
+            onNext={() => {
+              if (canProceedToNext()) {
+                const nextIndex = currentSectionIndex + 1;
+                if (nextIndex < state.currentForm.sections.length) {
+                  setCurrentSectionIndex(nextIndex);
+                }
+              }
+            }}
+            onPrevious={() => {
+              if (currentSectionIndex > 0) {
+                setCurrentSectionIndex(currentSectionIndex - 1);
+              }
+            }}
+            sectionTitles={state.currentForm.sections
+              .sort((a, b) => a.order - b.order)
+              .map(section => section.title)}
+          />
+        )}
+
+        {/* Submit button for single section or last section */}
+        {(!state.currentForm.sections ||
+          state.currentForm.sections.length <= 1 ||
+          currentSectionIndex === state.currentForm.sections.length - 1) && (
+            <div className="p-4 border-t bg-gray-50">
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="w-full inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Submit Form
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+      </div>
     </div>
   );
 }

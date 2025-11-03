@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDrop } from 'react-dnd';
 import { v4 as uuidv4 } from 'uuid';
 import { Save, Eye, Plus, Settings, Trash2 } from 'lucide-react';
 import { useForm } from '../contexts/FormContext';
 import { formApi } from '../services/api';
-import { FormField, FormColumn, Form } from '../types';
+import { FormField, FormColumn, Form, FormSection } from '../types';
 import FormRenderer from '../components/FormRenderer';
 import DragDropField from '../components/DragDropField';
 import FieldEditor from '../components/FieldEditor';
@@ -21,44 +21,90 @@ export default function FormBuilder() {
   const [selectedColumn, setSelectedColumn] = useState<FormColumn | null>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('FormBuilder useEffect - id:', id, 'currentForm:', state.currentForm?.id);
     if (id) {
       // Loading existing form
       if (!state.currentForm || state.currentForm.id !== id) {
+        console.log('Loading form because currentForm.id !== id');
         loadForm(id);
+      } else {
+        console.log('Form already loaded, setting active section');
+        // Form is already loaded, just set active section
+        if (state.currentForm.sections && state.currentForm.sections.length > 0) {
+          setActiveSectionId(state.currentForm.sections[0].id);
+        }
       }
     } else {
       // Creating new form - only if we don't already have a temporary form
       if (!state.currentForm || state.currentForm.id !== '') {
+        const defaultSectionId = uuidv4();
         const tempForm: Form = {
           id: '', // Empty ID indicates it's not saved yet
           name: 'New Form',
           fields: [],
-          columns: [{ id: uuidv4(), name: 'Main Column', width: 100, fieldIds: [] }],
-          sections: [],
+          columns: [{ id: uuidv4(), name: 'Main Column', width: 100, fieldIds: [] }], // Kept for backward compatibility
+          sections: [{
+            id: defaultSectionId,
+            title: 'Section 1',
+            description: '',
+            order: 1,
+            columns: [{ id: uuidv4(), name: 'Main Column', width: 100, fieldIds: [] }]
+          }],
           createdAt: new Date(),
           updatedAt: new Date(),
         };
         dispatch({ type: 'SET_CURRENT_FORM', payload: tempForm });
         setFormName(tempForm.name);
+        setActiveSectionId(defaultSectionId);
       }
     }
   }, [id]);
 
-  // Sync form name with current form when it changes
+  // Sync form name with current form when it changes (only on initial load)
   useEffect(() => {
-    if (state.currentForm && state.currentForm.name && !formName) {
+    if (state.currentForm && state.currentForm.name && formName === '') {
       setFormName(state.currentForm.name);
     }
-  }, [state.currentForm, formName]);
+  }, [state.currentForm]); // Removed formName from dependencies
 
   const loadForm = async (formId: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const form = await formApi.getForm(formId);
+      console.log('FormBuilder: Loaded form from API:', form);
+      console.log('FormBuilder: Form sections:', form.sections);
+
+      // Ensure backward compatibility: if no sections, create default section
+      if (!form.sections || form.sections.length === 0) {
+        console.log('FormBuilder: No sections found, creating default section');
+        const defaultSectionId = uuidv4();
+        form.sections = [{
+          id: defaultSectionId,
+          title: 'Section 1',
+          description: '',
+          order: 1,
+          columns: form.columns || []
+        }];
+
+        // Assign all fields to default section
+        form.fields = form.fields.map(field => ({
+          ...field,
+          sectionId: field.sectionId || defaultSectionId
+        }));
+      }
+
+      console.log('FormBuilder: Final form with sections:', form.sections);
       dispatch({ type: 'SET_CURRENT_FORM', payload: form });
       setFormName(form.name);
+
+      // Set active section to first section
+      if (form.sections && form.sections.length > 0) {
+        setActiveSectionId(form.sections[0].id);
+        console.log('FormBuilder: Set active section to:', form.sections[0].id);
+      }
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
     } finally {
@@ -80,6 +126,9 @@ export default function FormBuilder() {
       columns: state.currentForm.columns,
       sections: state.currentForm.sections || [],
     };
+
+    console.log('Saving form data:', formData);
+    console.log('Sections being saved:', formData.sections);
 
     // Validate form data before sending
     if (!finalFormName) {
@@ -115,11 +164,24 @@ export default function FormBuilder() {
   };
 
   const addField = (type: FormField['type']) => {
+    // Get the active section or first section
+    const targetSectionId = activeSectionId || state.currentForm?.sections[0]?.id;
+
+    console.log('Adding field:', {
+      type,
+      activeSectionId,
+      targetSectionId,
+      availableSections: state.currentForm?.sections?.map(s => ({ id: s.id, title: s.title })),
+      availableColumns: state.currentForm?.columns?.map(c => ({ id: c.id, name: c.name }))
+    });
+
     const newField: FormField = {
       id: uuidv4(),
       type,
       question: `New ${type} field`,
       required: false,
+      sectionId: targetSectionId,
+      // No columnId - will appear as unassigned
       ...(type === 'dropdown' && { options: ['Option 1', 'Option 2'] }),
       ...(type === 'table' && {
         tableColumns: [
@@ -128,6 +190,8 @@ export default function FormBuilder() {
         ],
       }),
     };
+
+    console.log('Created field with sectionId:', newField.sectionId);
     dispatch({ type: 'ADD_FIELD', payload: newField });
   };
 
@@ -139,6 +203,75 @@ export default function FormBuilder() {
       fieldIds: [],
     };
     dispatch({ type: 'ADD_COLUMN', payload: newColumn });
+  };
+
+  const addSection = () => {
+    if (!state.currentForm) return;
+
+    const newSection: FormSection = {
+      id: uuidv4(),
+      title: `Section ${(state.currentForm.sections?.length || 0) + 1}`,
+      description: '',
+      order: (state.currentForm.sections?.length || 0) + 1,
+      columns: [{ id: uuidv4(), name: 'Main Column', width: 100, fieldIds: [] }]
+    };
+
+    dispatch({
+      type: 'SET_CURRENT_FORM',
+      payload: {
+        ...state.currentForm,
+        sections: [...(state.currentForm.sections || []), newSection]
+      }
+    });
+
+    // Set the new section as active
+    setActiveSectionId(newSection.id);
+  };
+
+  const deleteSection = (sectionId: string) => {
+    if (!state.currentForm) return;
+
+    // Don't allow deleting the last section
+    if (state.currentForm.sections.length <= 1) {
+      alert('Cannot delete the last section');
+      return;
+    }
+
+    // Remove the section
+    const updatedSections = state.currentForm.sections.filter(s => s.id !== sectionId);
+
+    // Remove fields that belong to this section
+    const updatedFields = state.currentForm.fields.filter(f => f.sectionId !== sectionId);
+
+    dispatch({
+      type: 'SET_CURRENT_FORM',
+      payload: {
+        ...state.currentForm,
+        sections: updatedSections,
+        fields: updatedFields
+      }
+    });
+
+    // Set active section to the first one
+    if (activeSectionId === sectionId && updatedSections.length > 0) {
+      setActiveSectionId(updatedSections[0].id);
+    }
+  };
+
+  const updateSection = (sectionId: string, updates: Partial<FormSection>) => {
+    if (!state.currentForm) return;
+
+    const updatedSections = state.currentForm.sections.map(section =>
+      section.id === sectionId ? { ...section, ...updates } : section
+    );
+
+    dispatch({
+      type: 'SET_CURRENT_FORM',
+      payload: {
+        ...state.currentForm,
+        sections: updatedSections
+      }
+    });
   };
 
   const moveField = (dragIndex: number, hoverIndex: number) => {
@@ -204,7 +337,7 @@ export default function FormBuilder() {
   if (!state.currentForm) return null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
       {/* Sidebar - Field Types */}
       <div className="lg:col-span-1">
         <div className="bg-white rounded-lg shadow-sm border p-4">
@@ -265,7 +398,7 @@ export default function FormBuilder() {
       </div>
 
       {/* Main Form Builder */}
-      <div className="lg:col-span-2">
+      <div className="lg:col-span-3">
         <div className="bg-white rounded-lg shadow-sm border">
           <div className="p-4 border-b">
             <div className="flex items-center justify-between mb-4">
@@ -273,12 +406,6 @@ export default function FormBuilder() {
                 type="text"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
-                onBlur={(e) => {
-                  // Ensure form name is never empty
-                  if (!e.target.value.trim()) {
-                    setFormName(state.currentForm?.name || 'Untitled Form');
-                  }
-                }}
                 placeholder="Enter form name"
                 className="text-xl font-semibold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
               />
@@ -320,130 +447,194 @@ export default function FormBuilder() {
             </div>
           </div>
 
+          {/* Section Tabs */}
+          {state.currentForm && state.currentForm.sections && state.currentForm.sections.length > 0 && (
+            <div className="border-b bg-gray-50">
+              <div className="flex items-center px-4 py-2 overflow-x-auto">
+                {state.currentForm.sections
+                  .sort((a, b) => a.order - b.order)
+                  .map((section, index) => (
+                    <button
+                      key={section.id}
+                      onClick={() => setActiveSectionId(section.id)}
+                      className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeSectionId === section.id
+                        ? 'border-blue-600 text-blue-600'
+                        : 'border-transparent text-gray-600 hover:text-gray-900'
+                        }`}
+                    >
+                      {section.title}
+                      {state.currentForm && state.currentForm.sections.length > 1 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete section "${section.title}"?`)) {
+                              deleteSection(section.id);
+                            }
+                          }}
+                          className="ml-2 text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3 inline" />
+                        </button>
+                      )}
+                    </button>
+                  ))}
+                <button
+                  onClick={addSection}
+                  className="ml-2 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Section
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="p-6" ref={drop}>
-            {state.currentForm.fields.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <p>No fields added yet. Click on field types to add them.</p>
-                <p className="text-xs mt-2">Drag fields to columns in the sidebar to organize your form layout.</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Show fields organized by columns */}
-                {state.currentForm.columns.map((column: FormColumn) => {
-                  const fieldsInColumn = state.currentForm?.fields.filter(field => field.columnId === column.id) || [];
-                  if (fieldsInColumn.length === 0) return null;
+            {(() => {
+              // Get fields for the active section
+              // If no activeSectionId or fields don't have sectionId, show all fields
+              let sectionFields = state.currentForm.fields;
 
-                  return (
-                    <div key={column.id} className="border-2 border-dashed border-blue-200 rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-blue-700 mb-3 flex items-center">
-                        📋 {column.name} ({column.width}%)
-                        <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
-                          {fieldsInColumn.length} field{fieldsInColumn.length !== 1 ? 's' : ''}
-                        </span>
-                      </h4>
-                      <div className="space-y-3">
-                        {fieldsInColumn.map((field: FormField, index: number) => {
-                          const globalIndex = state.currentForm?.fields.findIndex(f => f.id === field.id) || 0;
-                          return (
-                            <DragDropField
-                              key={field.id}
-                              field={field}
-                              index={globalIndex}
-                              onMove={moveField}
-                            >
-                              <div className="border rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-medium text-gray-600">
-                                    {field.type.toUpperCase()}
-                                  </span>
-                                  <div className="flex space-x-1">
-                                    <button
-                                      onClick={() => setSelectedField(field)}
-                                      className="p-1 text-gray-600 hover:text-blue-600"
-                                    >
-                                      <Settings className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => dispatch({ type: 'DELETE_FIELD', payload: field.id })}
-                                      className="p-1 text-gray-600 hover:text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
+              if (activeSectionId) {
+                sectionFields = state.currentForm.fields.filter(
+                  field => field.sectionId === activeSectionId
+                );
+
+                // Fallback: if filtering results in no fields, show fields without sectionId
+                if (sectionFields.length === 0) {
+                  sectionFields = state.currentForm.fields.filter(field => !field.sectionId);
+                }
+              }
+
+              if (sectionFields.length === 0) {
+                return (
+                  <div className="text-center py-12 text-gray-500">
+                    <p>No fields in this section yet. Click on field types to add them.</p>
+                    <p className="text-xs mt-2">Drag fields to columns in the sidebar to organize your form layout.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-6">
+                  {/* Show fields organized by columns */}
+                  {state.currentForm.columns.map((column: FormColumn) => {
+                    const fieldsInColumn = sectionFields.filter(field => field.columnId === column.id);
+                    if (fieldsInColumn.length === 0) return null;
+
+                    return (
+                      <div key={column.id} className="border-2 border-dashed border-blue-200 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-blue-700 mb-3 flex items-center">
+                          📋 {column.name} ({column.width}%)
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                            {fieldsInColumn.length} field{fieldsInColumn.length !== 1 ? 's' : ''}
+                          </span>
+                        </h4>
+                        <div className="space-y-3">
+                          {fieldsInColumn.map((field: FormField, index: number) => {
+                            const globalIndex = state.currentForm?.fields.findIndex(f => f.id === field.id) || 0;
+                            return (
+                              <DragDropField
+                                key={field.id}
+                                field={field}
+                                index={globalIndex}
+                                onMove={moveField}
+                              >
+                                <div className="border rounded-lg p-4 bg-white hover:bg-gray-50 transition-colors">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-gray-600">
+                                      {field.type.toUpperCase()}
+                                    </span>
+                                    <div className="flex space-x-1">
+                                      <button
+                                        onClick={() => setSelectedField(field)}
+                                        className="p-1 text-gray-600 hover:text-blue-600"
+                                      >
+                                        <Settings className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => dispatch({ type: 'DELETE_FIELD', payload: field.id })}
+                                        className="p-1 text-gray-600 hover:text-red-600"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
                                   </div>
+                                  <FormRenderer field={field} preview={false} />
                                 </div>
-                                <FormRenderer field={field} preview={false} />
-                              </div>
-                            </DragDropField>
-                          );
-                        })}
+                              </DragDropField>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
 
-                {/* Show unassigned fields */}
-                {(() => {
-                  const unassignedFields = state.currentForm?.fields.filter(field => !field.columnId) || [];
-                  if (unassignedFields.length === 0) return null;
+                  {/* Show unassigned fields in current section */}
+                  {(() => {
+                    const unassignedFields = sectionFields.filter(field => !field.columnId);
+                    if (unassignedFields.length === 0) return null;
 
-                  return (
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                      <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center">
-                        📝 Unassigned Fields
-                        <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                          Drag to columns to organize
-                        </span>
-                      </h4>
-                      <div className="space-y-3">
-                        {unassignedFields.map((field: FormField, index: number) => {
-                          const globalIndex = state.currentForm?.fields.findIndex(f => f.id === field.id) || 0;
-                          return (
-                            <DragDropField
-                              key={field.id}
-                              field={field}
-                              index={globalIndex}
-                              onMove={moveField}
-                            >
-                              <div className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-sm font-medium text-gray-600">
-                                    {field.type.toUpperCase()}
-                                  </span>
-                                  <div className="flex space-x-1">
-                                    <button
-                                      onClick={() => setSelectedField(field)}
-                                      className="p-1 text-gray-600 hover:text-blue-600"
-                                    >
-                                      <Settings className="h-4 w-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => dispatch({ type: 'DELETE_FIELD', payload: field.id })}
-                                      className="p-1 text-gray-600 hover:text-red-600"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
+                    return (
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-gray-600 mb-3 flex items-center">
+                          📝 Unassigned Fields
+                          <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                            Drag to columns to organize
+                          </span>
+                        </h4>
+                        <div className="space-y-3">
+                          {unassignedFields.map((field: FormField, index: number) => {
+                            const globalIndex = state.currentForm?.fields.findIndex(f => f.id === field.id) || 0;
+                            return (
+                              <DragDropField
+                                key={field.id}
+                                field={field}
+                                index={globalIndex}
+                                onMove={moveField}
+                              >
+                                <div className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-gray-600">
+                                      {field.type.toUpperCase()}
+                                    </span>
+                                    <div className="flex space-x-1">
+                                      <button
+                                        onClick={() => setSelectedField(field)}
+                                        className="p-1 text-gray-600 hover:text-blue-600"
+                                      >
+                                        <Settings className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => dispatch({ type: 'DELETE_FIELD', payload: field.id })}
+                                        className="p-1 text-gray-600 hover:text-red-600"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
                                   </div>
+                                  <FormRenderer field={field} preview={false} />
                                 </div>
-                                <FormRenderer field={field} preview={false} />
-                              </div>
-                            </DragDropField>
-                          );
-                        })}
+                              </DragDropField>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
+                    );
+                  })()}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
 
       {/* Right Sidebar - Field/Column Editor */}
-      <div className="lg:col-span-1">
+      <div className="lg:col-span-2">
         {selectedField && (
           <FieldEditor
             field={selectedField}
+            sections={state.currentForm?.sections || []}
             onUpdate={(updates: Partial<FormField>) => {
               dispatch({
                 type: 'UPDATE_FIELD',
@@ -479,7 +670,7 @@ export default function FormBuilder() {
       </div>
 
       {state.error && (
-        <div className="lg:col-span-4 p-4 bg-red-50 border border-red-200 rounded-md">
+        <div className="lg:col-span-6 p-4 bg-red-50 border border-red-200 rounded-md">
           <p className="text-red-600">{state.error}</p>
         </div>
       )}

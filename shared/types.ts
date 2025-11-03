@@ -44,15 +44,15 @@ export interface FormSection {
   title: string;
   description?: string;
   order: number;
-  columns?: FormColumn[]; // Columns are now part of sections
+  columns: FormColumn[]; // Each section has its own columns
 }
 
 export interface Form {
   id: string;
   name: string;
-  fields: FormField[];
-  columns: FormColumn[];
-  sections: FormSection[];
+  fields: FormField[]; // All fields, with sectionId to link them
+  columns: FormColumn[]; // Deprecated - kept for backward compatibility
+  sections: FormSection[]; // Sections contain columns
   createdAt: Date;
   updatedAt: Date;
 }
