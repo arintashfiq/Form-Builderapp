@@ -26,10 +26,14 @@ A comprehensive full-stack web application for creating dynamic marketing campai
 
 **⚡ Advanced Features:**
 - 🔀 **Conditional Logic** - Jump to questions based on dropdown selections
+- 🎛️ **Section Controls** - Toggle submit/next buttons per section
+- 🌊 **Custom Flow Control** - Set specific next section targets
+- 🔀 **Smart Branching** - Users follow different paths based on choices
 - 💾 **Auto-save Protection** - Explicit save changes for field editing
 - ✅ **Comprehensive Validation** - Client and server-side validation
 - 📊 **Submissions Viewer** - View and export form responses
 - 🗄️ **Database Integration** - Full MySQL persistence
+- 📱 **Mobile Responsive** - Perfect experience on all devices
 
 ## 🛠️ Tech Stack
 
@@ -59,9 +63,12 @@ A comprehensive full-stack web application for creating dynamic marketing campai
 ### Live Application Features:
 - **📝 Form Creation**: Drag & drop interface for building forms
 - **🎨 Layout Design**: Multi-column responsive layouts
+- **🎛️ Section Controls**: Advanced section-level navigation settings
+- **🔀 Smart Branching**: Conditional paths based on user choices
 - **👀 Live Preview**: Test forms before publishing
 - **📊 Data Management**: View and export form submissions
 - **🔧 Field Editing**: Comprehensive field configuration options
+- **📱 Mobile Optimized**: Perfect experience on all devices
 
 ## 🚀 Quick Start
 
@@ -126,6 +133,50 @@ The application will be available at:
 - Visit http://localhost:3001/api/health to check backend
 - Visit http://localhost:3000 to access the form builder
 
+### Troubleshooting Setup Issues
+
+**Common Issues:**
+
+1. **Port Already in Use**
+   ```bash
+   # Kill processes on ports 3000/3001
+   lsof -ti:3000 | xargs kill -9
+   lsof -ti:3001 | xargs kill -9
+   ```
+
+2. **MySQL Connection Error**
+   ```bash
+   # Check MySQL is running
+   brew services list | grep mysql
+   # Start MySQL if needed
+   brew services start mysql
+   ```
+
+3. **Database Doesn't Exist**
+   ```sql
+   mysql -u root -p
+   CREATE DATABASE form_builder;
+   SHOW DATABASES; -- Verify it was created
+   exit
+   ```
+
+4. **Environment Variables**
+   ```bash
+   # Ensure .env file exists and has correct values
+   cd backend
+   cat .env
+   # Should show your MySQL credentials
+   ```
+
+5. **Dependencies Issues**
+   ```bash
+   # Clean install all dependencies
+   rm -rf node_modules frontend/node_modules backend/node_modules
+   npm run install:all
+   ```
+
+**Need Help?** Check `TROUBLESHOOTING.md` for detailed solutions.
+
 ## Project Structure
 
 ```
@@ -176,12 +227,25 @@ form-builder/
 - File type restrictions
 - Size limits (10MB max)
 
-### Conditional Logic
+### Advanced Navigation & Branching
 
+**Conditional Logic:**
 Set up form flows where dropdown selections can:
-- Jump to specific questions
-- Show/hide other fields
+- Jump to specific sections
+- Skip irrelevant sections
 - Create dynamic user experiences
+
+**Section Controls:**
+Configure each section individually:
+- **Allow Submit**: Toggle form submission per section
+- **Allow Next**: Enable/disable next button
+- **Custom Flow**: Set specific next section targets
+- **Smart Branching**: Users follow different paths based on choices
+
+**Example Use Cases:**
+- **Survey Branching**: Different questions based on user type
+- **Multi-step Registration**: Force completion of required sections
+- **Progressive Disclosure**: Show advanced options only when needed
 
 ### Responsive Design
 
@@ -273,29 +337,36 @@ This project was built as a sprint deliverable for a marketing agency. The codeb
 
 ## 🆕 Latest Features
 
-### **Drag & Drop Field Organization**
-- Drag fields from the main area to columns in the sidebar
-- Visual drop zones with hover feedback
-- Fields organized by columns in the main form area
-- Unassigned fields section for better organization
+### **🎛️ Advanced Section Controls**
+- **Section-level Submit Control**: Toggle form submission per section
+- **Section-level Next Control**: Enable/disable next button per section
+- **Custom Section Flow**: Set specific next section targets
+- **Visual Section Editor**: Comprehensive UI with toggle switches
+- **Unsaved Changes Tracking**: Visual feedback for form builders
 
-### **Enhanced Field Editor**
-- No more auto-save issues with dropdown/table field editing
-- Explicit "Save Changes" button for field modifications
-- Unsaved changes indicator in the editor header
-- Cancel button to revert changes
+### **🔀 Smart Conditional Branching**
+- **Priority-based Navigation**: Custom > Conditional > Sequential
+- **Path Tracking**: System tracks user's journey through sections
+- **Section Skipping**: Users bypass irrelevant sections automatically
+- **Flexible Targeting**: Point to specific sections or submit form directly
 
-### **Submissions Management**
-- Comprehensive submissions viewer page
-- Export form responses to CSV
-- Real-time data from MySQL database
-- Command-line database access tools
+### **📱 Mobile Responsiveness**
+- **Responsive Form Layouts**: Adapts to all screen sizes
+- **Mobile-friendly Tables**: Card layout on mobile devices
+- **Touch-optimized Controls**: Larger buttons and touch targets
+- **Adaptive File Upload**: Mobile-specific UI improvements
 
-### **Database Access Tools**
-- Web-based submissions viewer
-- Command-line database viewer script (`./view-database.sh`)
-- Direct MySQL access commands
-- API endpoints for programmatic access
+### **🔧 Enhanced Form Builder**
+- **Drag & Drop Organization**: Visual field organization in columns
+- **Real-time Preview**: See changes instantly
+- **Field Validation**: Comprehensive client and server-side validation
+- **Auto-save Protection**: Explicit save for critical changes
+
+### **📊 Data Management**
+- **Submissions Viewer**: View and export form responses
+- **Database Tools**: Command-line database viewer script
+- **CSV Export**: Download submission data
+- **Real-time Updates**: Live data from MySQL database
 
 ## 📊 Database Schema
 
@@ -304,8 +375,9 @@ The application uses MySQL with the following structure:
 **Forms Table:**
 - `id` (VARCHAR) - Primary key
 - `name` (VARCHAR) - Form name
-- `fields` (JSON) - Form field definitions
+- `fields` (JSON) - Form field definitions with conditional logic
 - `columns` (JSON) - Layout configuration
+- `sections` (JSON) - Multi-section configuration with navigation controls
 - `created_at`, `updated_at` (TIMESTAMP)
 
 **Form Submissions Table:**
@@ -313,6 +385,20 @@ The application uses MySQL with the following structure:
 - `form_id` (VARCHAR) - Foreign key to forms
 - `data` (JSON) - Submitted form data
 - `submitted_at` (TIMESTAMP)
+
+**Section Configuration (JSON):**
+```json
+{
+  "id": "section-id",
+  "title": "Section Title",
+  "description": "Optional description",
+  "order": 1,
+  "allowSubmit": true,
+  "allowNext": true,
+  "nextSectionId": "target-section-id",
+  "columns": [...]
+}
+```
 
 ## 🤝 Contributing
 

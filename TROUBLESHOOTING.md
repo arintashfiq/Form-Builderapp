@@ -106,3 +106,95 @@ Then restart backend to recreate tables.
 - **MySQL**: 8.0 or higher  
 - **RAM**: 4GB minimum, 8GB recommended
 - **Storage**: 1GB free space for dependencies and uploads
+### 7
+. Section Navigation Issues
+
+**Issue**: Custom section flow not working (e.g., Section 2 → Section 4 not skipping Section 3)
+**Solutions**:
+- **Save the form**: Section settings are only applied after clicking "Save Changes"
+- **Check orange save button**: If button is orange, there are unsaved section changes
+- **Verify section settings**: Click settings icon on section tab to check configuration
+- **Console debugging**: Open browser dev tools to see navigation logs
+
+**Issue**: Submit button not appearing/disappearing unexpectedly
+**Solutions**:
+- Check section's "Allow Submit" setting in section editor
+- Verify you're on the last section of your allowed path
+- Ensure required fields are filled
+
+**Issue**: Next button disabled
+**Solutions**:
+- Fill all required fields in current section
+- Check section's "Allow Next" setting
+- Verify conditional dropdown fields have selections (if applicable)
+
+### 8. Conditional Logic Problems
+
+**Issue**: Dropdown conditional logic not triggering
+**Solutions**:
+- Ensure dropdown has options that match conditional rules exactly
+- Check that target sections exist
+- Save the form after editing conditional logic
+- Verify conditional rules in field editor match dropdown options
+
+**Issue**: Form gets stuck in conditional loop
+**Solutions**:
+- Check conditional rules don't create circular references
+- Ensure all conditional paths lead to valid sections or form submission
+- Use "end" target to submit form directly from conditional logic
+
+### 9. Mobile Responsiveness Issues
+
+**Issue**: Form not displaying correctly on mobile
+**Solutions**:
+- Clear browser cache and reload
+- Check if using latest version (mobile improvements recently added)
+- Test in different mobile browsers
+
+**Issue**: Table fields not working on mobile
+**Solutions**:
+- Tables automatically switch to card layout on mobile
+- Ensure JavaScript is enabled
+- Try refreshing the page
+
+### 10. Performance Issues
+
+**Issue**: Form builder slow with many fields
+**Solutions**:
+- Organize fields into columns for better performance
+- Use sections to break up large forms
+- Consider splitting very large forms into multiple smaller forms
+
+### 11. Data Loss Prevention
+
+**Issue**: Lost work when browser crashes
+**Solutions**:
+- Save frequently using the "Save" button
+- Watch for orange "Save Changes" button indicating unsaved work
+- Use browser's back button carefully (may lose unsaved changes)
+
+## Getting Help
+
+If you encounter issues not covered here:
+
+1. **Check Browser Console**: Open Developer Tools (F12) and look for error messages
+2. **Check Backend Logs**: Look at the terminal running the backend for error messages
+3. **Verify Setup**: Ensure all installation steps were completed correctly
+4. **Database Check**: Use `./view-database.sh` to inspect database contents
+5. **Clean Restart**: Stop all processes, clear caches, and restart
+
+## System Requirements
+
+- **Node.js**: 18.0.0 or higher
+- **MySQL**: 8.0 or higher  
+- **Browser**: Modern browser with JavaScript enabled
+- **Memory**: At least 4GB RAM recommended
+- **Storage**: 500MB free space for dependencies
+
+## Debug Mode
+
+For detailed debugging, check the browser console for:
+- `🔄 handleNextSection called:` - Section navigation debugging
+- `💾 SectionEditor saving updates:` - Section settings changes
+- `🎯 Using configured next section:` - Custom flow confirmation
+- `✅ Successfully navigating to section:` - Navigation success
