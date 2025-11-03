@@ -22,7 +22,7 @@ exit
 # 5. Configure backend environment
 cd backend
 cp .env.example .env
-# Edit .env file with your MySQL credentials
+# Edit .env file - set DB_PASSWORD=your_mysql_password
 
 # 6. Start the application
 cd ..
@@ -61,16 +61,20 @@ The application will automatically create the required tables on first run.
 
 ## Environment Variables
 
-Edit `backend/.env`:
+Edit `backend/.env` with your MySQL password:
 
-```
+```env
 PORT=3001
 DB_HOST=localhost
-DB_USER=your_mysql_user
-DB_PASSWORD=your_mysql_password
+DB_USER=root
+DB_PASSWORD=your_actual_mysql_password_here
 DB_NAME=form_builder
 DB_PORT=3306
 ```
+
+**Examples:**
+- No password: `DB_PASSWORD=`
+- With password: `DB_PASSWORD=mypassword123`
 
 ## Verification
 

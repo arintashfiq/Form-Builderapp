@@ -94,7 +94,7 @@ mysql -u root -e "CREATE DATABASE form_builder;"
 
 # 3. Configure environment
 cd backend && cp .env.example .env
-# Edit .env with your MySQL credentials
+# Edit backend/.env and set DB_PASSWORD=your_mysql_password
 
 # 4. Start the application
 npm run dev
@@ -111,14 +111,49 @@ exit
 ```bash
 cd backend
 cp .env.example .env
-# Edit .env with your MySQL credentials:
-# DB_HOST=localhost
-# DB_USER=your_mysql_user
-# DB_PASSWORD=your_mysql_password
-# DB_NAME=form_builder
-# DB_PORT=3306
-cd ..
 ```
+
+**Edit the `.env` file with your MySQL credentials:**
+
+Open `backend/.env` in a text editor and update these values:
+
+```env
+PORT=3001
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=your_mysql_password_here
+DB_NAME=form_builder
+DB_PORT=3306
+```
+
+**Common Examples:**
+
+- **Default MySQL (no password):**
+  ```env
+  DB_PASSWORD=
+  ```
+
+- **MySQL with password:**
+  ```env
+  DB_PASSWORD=mypassword123
+  ```
+
+- **Custom MySQL user:**
+  ```env
+  DB_USER=myuser
+  DB_PASSWORD=mypassword
+  ```
+
+- **Different MySQL port:**
+  ```env
+  DB_PORT=3307
+  ```
+
+**💡 Tips:**
+- **Default MySQL**: Usually only need to set `DB_PASSWORD`
+- **No Password**: Leave `DB_PASSWORD=` empty
+- **Forgot Password?** Reset it with: `mysql -u root -p` then `ALTER USER 'root'@'localhost' IDENTIFIED BY 'newpassword';`
+- **Test Connection**: `mysql -u root -p form_builder` (should connect without errors)
 
 ### Start the Application
 ```bash
