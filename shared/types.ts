@@ -45,6 +45,9 @@ export interface FormSection {
   description?: string;
   order: number;
   columns: FormColumn[]; // Each section has its own columns
+  allowSubmit?: boolean; // Whether form can be submitted from this section
+  allowNext?: boolean; // Whether next button is enabled
+  nextSectionId?: string; // Which section to go to next (if allowNext is true)
 }
 
 export interface Form {

@@ -15,6 +15,8 @@ export default function FormPreview() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [allowedSections, setAllowedSections] = useState<Set<string>>(new Set());
+  const [sectionPath, setSectionPath] = useState<string[]>([]);
 
 
   useEffect(() => {
@@ -63,6 +65,13 @@ export default function FormPreview() {
       const cleanedForm = cleanupConditionalLogic(form);
       
       dispatch({ type: 'SET_CURRENT_FORM', payload: cleanedForm });
+      
+      // Initialize allowed sections - first section is always allowed
+      if (cleanedForm.sections && cleanedForm.sections.length > 0) {
+        const firstSection = cleanedForm.sections.sort((a, b) => a.order - b.order)[0];
+        setAllowedSections(new Set([firstSection.id]));
+        setSectionPath([firstSection.id]);
+      }
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
     } finally {
@@ -126,7 +135,9 @@ export default function FormPreview() {
     console.log('🎯 Conditional trigger called:', {
       targetSectionId,
       currentSectionIndex,
-      availableSections: state.currentForm?.sections?.map(s => ({ id: s.id, title: s.title })) || []
+      availableSections: state.currentForm?.sections?.map(s => ({ id: s.id, title: s.title })) || [],
+      currentAllowedSections: Array.from(allowedSections),
+      currentPath: sectionPath
     });
     
     if (targetSectionId === 'end') {
@@ -137,12 +148,168 @@ export default function FormPreview() {
       console.log('🔍 Looking for section:', { targetSectionId, targetIndex });
       
       if (targetIndex !== undefined && targetIndex !== -1) {
-        console.log('✅ Navigating to section:', targetIndex);
+        console.log('✅ Navigating to section via conditional logic:', targetIndex);
+        
+        // Add target section to allowed sections
+        const newAllowedSections = new Set(allowedSections);
+        newAllowedSections.add(targetSectionId);
+        setAllowedSections(newAllowedSections);
+        
+        // Update the section path
+        const newPath = [...sectionPath, targetSectionId];
+        setSectionPath(newPath);
+        
+        console.log('🔀 Updated branching state:', {
+          newAllowedSections: Array.from(newAllowedSections),
+          newPath
+        });
+        
         setCurrentSectionIndex(targetIndex);
       } else {
         console.log('❌ Target section not found:', targetSectionId);
       }
     }
+  };
+
+  const getNextAllowedSection = (currentIndex: number): number | null => {
+    if (!state.currentForm?.sections) return null;
+    
+    const sortedSections = state.currentForm.sections.sort((a, b) => a.order - b.order);
+    
+    // Look for the next section that is in our allowed sections
+    for (let i = currentIndex + 1; i < sortedSections.length; i++) {
+      const section = sortedSections[i];
+      if (allowedSections.has(section.id)) {
+        console.log('📍 Found next allowed section:', {
+          sectionIndex: i,
+          sectionId: section.id,
+          sectionTitle: section.title
+        });
+        return i;
+      }
+    }
+    
+    console.log('🏁 No more allowed sections, should submit');
+    return null; // No more allowed sections, should submit
+  };
+
+  const handleNextSection = () => {
+    if (!canProceedToNext() || !state.currentForm?.sections) return;
+    
+    const sortedSections = state.currentForm.sections.sort((a, b) => a.order - b.order);
+    const currentSection = sortedSections[currentSectionIndex];
+    
+    console.log('🔄 handleNextSection called:', {
+      currentSectionIndex,
+      currentSectionTitle: currentSection.title,
+      allowNext: currentSection.allowNext,
+      nextSectionId: currentSection.nextSectionId
+    });
+    
+    // Check if current section allows next navigation
+    if (currentSection.allowNext === false) {
+      console.log('🚫 Next navigation disabled for this section');
+      return;
+    }
+    
+    let nextIndex: number | null = null;
+    let navigationReason = '';
+    
+    // Priority 1: Check if current section has a specific next section configured
+    if (currentSection.nextSectionId) {
+      if (currentSection.nextSectionId === 'end') {
+        console.log('🏁 Section configured to submit form');
+        handleSubmit(new Event('submit') as any);
+        return;
+      } else {
+        // Find the configured next section
+        nextIndex = sortedSections.findIndex(s => s.id === currentSection.nextSectionId);
+        if (nextIndex !== -1) {
+          navigationReason = 'configured nextSectionId';
+          console.log('🎯 Using configured next section:', {
+            sectionIndex: nextIndex,
+            sectionId: currentSection.nextSectionId,
+            sectionTitle: sortedSections[nextIndex].title,
+            reason: navigationReason
+          });
+        } else {
+          console.log('❌ Configured next section not found:', currentSection.nextSectionId);
+        }
+      }
+    }
+    
+    // Priority 2: If no valid custom next section, check conditional logic
+    if (nextIndex === null || nextIndex === -1) {
+      nextIndex = getNextAllowedSection(currentSectionIndex);
+      if (nextIndex !== null) {
+        navigationReason = 'conditional logic';
+        console.log('🔀 Using conditional logic navigation:', {
+          sectionIndex: nextIndex,
+          sectionTitle: sortedSections[nextIndex].title,
+          reason: navigationReason
+        });
+      }
+    }
+    
+    // Priority 3: If no conditional path, use sequential navigation
+    if (nextIndex === null) {
+      const sequentialNextIndex = currentSectionIndex + 1;
+      if (sequentialNextIndex < sortedSections.length) {
+        nextIndex = sequentialNextIndex;
+        navigationReason = 'sequential';
+        console.log('➡️ Using sequential navigation:', {
+          sectionIndex: nextIndex,
+          sectionId: sortedSections[nextIndex].id,
+          sectionTitle: sortedSections[nextIndex].title,
+          reason: navigationReason
+        });
+      }
+    }
+    
+    // Execute the navigation
+    if (nextIndex !== null && nextIndex !== -1 && nextIndex < sortedSections.length) {
+      const nextSection = sortedSections[nextIndex];
+      
+      // Add next section to allowed sections
+      const newAllowedSections = new Set(allowedSections);
+      newAllowedSections.add(nextSection.id);
+      setAllowedSections(newAllowedSections);
+      
+      // Update path
+      const newPath = [...sectionPath, nextSection.id];
+      setSectionPath(newPath);
+      
+      console.log('✅ Successfully navigating to section:', {
+        fromIndex: currentSectionIndex,
+        toIndex: nextIndex,
+        toSectionTitle: nextSection.title,
+        navigationReason,
+        newPath: newPath.map(id => sortedSections.find(s => s.id === id)?.title).join(' → ')
+      });
+      
+      setCurrentSectionIndex(nextIndex);
+    } else {
+      console.log('🏁 No valid next section found, submitting form');
+      handleSubmit(new Event('submit') as any);
+    }
+  };
+
+  const isAtEndOfAllowedPath = (): boolean => {
+    if (!state.currentForm?.sections) return true;
+    
+    // Check if there are any more allowed sections after the current one
+    const nextAllowedIndex = getNextAllowedSection(currentSectionIndex);
+    return nextAllowedIndex === null;
+  };
+
+  const canSubmitFromCurrentSection = (): boolean => {
+    if (!state.currentForm?.sections) return true;
+    
+    const sortedSections = state.currentForm.sections.sort((a, b) => a.order - b.order);
+    const currentSection = sortedSections[currentSectionIndex];
+    
+    // Check if current section allows submission (default to true for backward compatibility)
+    return currentSection.allowSubmit !== false;
   };
 
   const getVisibleFields = () => {
@@ -175,6 +342,16 @@ export default function FormPreview() {
 
   const canProceedToNext = (): boolean => {
     if (!state.currentForm) return false;
+
+    // Check if current section allows next navigation
+    if (state.currentForm.sections && state.currentForm.sections.length > 0) {
+      const sortedSections = state.currentForm.sections.sort((a, b) => a.order - b.order);
+      const currentSection = sortedSections[currentSectionIndex];
+      
+      if (currentSection.allowNext === false) {
+        return false;
+      }
+    }
 
     const visibleFields = getVisibleFields();
     
@@ -368,6 +545,8 @@ export default function FormPreview() {
         </div>
       )}
 
+
+
       <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
         <form onSubmit={handleSubmit} className="p-8">
           {renderFormColumns()}
@@ -379,24 +558,17 @@ export default function FormPreview() {
             currentSection={currentSectionIndex}
             totalSections={state.currentForm.sections.length}
             canGoNext={canProceedToNext()}
-            onNext={() => {
-              if (canProceedToNext() && state.currentForm) {
-                const nextIndex = currentSectionIndex + 1;
-                if (nextIndex < state.currentForm.sections.length) {
-                  setCurrentSectionIndex(nextIndex);
-                }
-              }
-            }}
+            onNext={handleNextSection}
             sectionTitles={state.currentForm.sections
               .sort((a, b) => a.order - b.order)
               .map(section => section.title)}
           />
         )}
 
-        {/* Submit button for single section or last section */}
+        {/* Submit button for single section or end of allowed path */}
         {(!state.currentForm.sections ||
           state.currentForm.sections.length <= 1 ||
-          currentSectionIndex === state.currentForm.sections.length - 1) && (
+          (isAtEndOfAllowedPath() && canSubmitFromCurrentSection())) && (
             <div className="p-4 border-t bg-gray-50">
               <button
                 onClick={handleSubmit}

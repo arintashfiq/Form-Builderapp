@@ -11,6 +11,7 @@ import DragDropField from '../components/DragDropField';
 import FieldEditor from '../components/FieldEditor';
 import ColumnEditor from '../components/ColumnEditor';
 import DropZoneColumn from '../components/DropZoneColumn';
+import SectionEditor from '../components/SectionEditor';
 
 export default function FormBuilder() {
   const { id } = useParams();
@@ -24,6 +25,9 @@ export default function FormBuilder() {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionTitle, setEditingSectionTitle] = useState('');
+  const [selectedSection, setSelectedSection] = useState<FormSection | null>(null);
+  const [showSectionEditor, setShowSectionEditor] = useState(false);
+  const [hasUnsavedSectionChanges, setHasUnsavedSectionChanges] = useState(false);
 
   useEffect(() => {
     console.log('FormBuilder useEffect - id:', id, 'currentForm:', state.currentForm?.id);
@@ -184,6 +188,7 @@ export default function FormBuilder() {
         // Update local state with the saved name
         setFormName(finalFormName);
         dispatch({ type: 'SET_ERROR', payload: null });
+        setHasUnsavedSectionChanges(false);
       } else {
         // Create new form (first time saving)
         const newId = await formApi.createForm(formData);
@@ -195,6 +200,7 @@ export default function FormBuilder() {
         setFormName(finalFormName);
         navigate(`/builder/${newId}`);
         dispatch({ type: 'SET_ERROR', payload: null });
+        setHasUnsavedSectionChanges(false);
       }
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
@@ -253,7 +259,10 @@ export default function FormBuilder() {
       title: `Section ${(state.currentForm.sections?.length || 0) + 1}`,
       description: '',
       order: (state.currentForm.sections?.length || 0) + 1,
-      columns: [{ id: uuidv4(), name: 'Main Column', width: 100, fieldIds: [] }]
+      columns: [{ id: uuidv4(), name: 'Main Column', width: 100, fieldIds: [] }],
+      allowSubmit: true, // Default: allow submission
+      allowNext: true, // Default: allow next navigation
+      nextSectionId: undefined // Default: sequential navigation
     };
 
     dispatch({
@@ -301,9 +310,19 @@ export default function FormBuilder() {
   const updateSection = (sectionId: string, updates: Partial<FormSection>) => {
     if (!state.currentForm) return;
 
+    console.log('🔄 FormBuilder updateSection called:', {
+      sectionId,
+      updates,
+      currentSections: state.currentForm.sections.map(s => ({ id: s.id, title: s.title, nextSectionId: s.nextSectionId }))
+    });
+
     const updatedSections = state.currentForm.sections.map(section =>
       section.id === sectionId ? { ...section, ...updates } : section
     );
+
+    console.log('✅ FormBuilder sections updated:', {
+      updatedSections: updatedSections.map(s => ({ id: s.id, title: s.title, nextSectionId: s.nextSectionId }))
+    });
 
     dispatch({
       type: 'SET_CURRENT_FORM',
@@ -312,6 +331,9 @@ export default function FormBuilder() {
         sections: updatedSections
       }
     });
+
+    // Mark that there are unsaved section changes
+    setHasUnsavedSectionChanges(true);
   };
 
   const startEditingSection = (sectionId: string, currentTitle: string) => {
@@ -487,7 +509,11 @@ export default function FormBuilder() {
                 <button
                   onClick={saveForm}
                   disabled={isSaving}
-                  className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`inline-flex items-center px-3 py-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed ${
+                    hasUnsavedSectionChanges 
+                      ? 'bg-orange-600 hover:bg-orange-700 text-white' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
                 >
                   {isSaving ? (
                     <>
@@ -497,7 +523,10 @@ export default function FormBuilder() {
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-1" />
-                      Save
+                      {hasUnsavedSectionChanges ? 'Save Changes' : 'Save'}
+                      {hasUnsavedSectionChanges && (
+                        <span className="ml-1 text-xs bg-orange-500 text-white px-1 rounded">!</span>
+                      )}
                     </>
                   )}
                 </button>
@@ -538,21 +567,25 @@ export default function FormBuilder() {
                           />
                         </div>
                       ) : (
-                        <button
-                          onClick={() => setActiveSectionId(section.id)}
-                          onDoubleClick={() => startEditingSection(section.id, section.title)}
-                          className="flex items-center"
-                          title="Double-click to edit section name"
-                        >
-                          {section.title}
-                          <Settings 
-                            className="h-3 w-3 ml-1 opacity-50 hover:opacity-100" 
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => setActiveSectionId(section.id)}
+                            className="flex items-center"
+                          >
+                            {section.title}
+                          </button>
+                          <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              startEditingSection(section.id, section.title);
+                              setSelectedSection(section);
+                              setShowSectionEditor(true);
                             }}
-                          />
-                        </button>
+                            className="ml-2 p-1 text-gray-400 hover:text-blue-600 rounded"
+                            title="Section Settings"
+                          >
+                            <Settings className="h-3 w-3" />
+                          </button>
+                        </div>
                       )}
                       {state.currentForm && state.currentForm.sections.length > 1 && (
                         <button
@@ -755,6 +788,21 @@ export default function FormBuilder() {
               dispatch({ type: 'DELETE_COLUMN', payload: selectedColumn.id });
               setShowColumnEditor(false);
               setSelectedColumn(null);
+            }}
+          />
+        )}
+
+        {showSectionEditor && selectedSection && (
+          <SectionEditor
+            section={selectedSection}
+            sections={state.currentForm?.sections || []}
+            onUpdate={(updates: Partial<FormSection>) => {
+              updateSection(selectedSection.id, updates);
+              setSelectedSection({ ...selectedSection, ...updates });
+            }}
+            onClose={() => {
+              setShowSectionEditor(false);
+              setSelectedSection(null);
             }}
           />
         )}

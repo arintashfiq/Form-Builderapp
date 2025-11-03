@@ -46,7 +46,10 @@ const formSchema = Joi.object({
             name: Joi.string().required(),
             width: Joi.number().required(),
             fieldIds: Joi.array().items(Joi.string()).required()
-        })).optional()
+        })).optional(),
+        allowSubmit: Joi.boolean().optional(),
+        allowNext: Joi.boolean().optional(),
+        nextSectionId: Joi.string().optional().allow('')
     })).optional().default([])
 });
 
