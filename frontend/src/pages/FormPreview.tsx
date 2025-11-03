@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Send } from 'lucide-react';
 import { useForm } from '../contexts/FormContext';
+import { Form } from '../types';
 import { formApi } from '../services/api';
 import FormRenderer from '../components/FormRenderer';
 import SectionNavigation from '../components/SectionNavigation';
@@ -22,11 +23,46 @@ export default function FormPreview() {
     }
   }, [id]);
 
+  const cleanupConditionalLogic = (form: Form): Form => {
+    const sectionIds = form.sections?.map(s => s.id) || [];
+    
+    const cleanedFields = form.fields.map(field => {
+      if (field.type === 'dropdown' && field.conditionalLogic && field.options) {
+        // Remove conditional rules that reference non-existent options or sections
+        const validConditions = field.conditionalLogic.conditions.filter(condition => {
+          const hasValidOption = field.options!.includes(condition.answer);
+          const hasValidTarget = condition.targetSectionId === 'end' || sectionIds.includes(condition.targetSectionId);
+          return hasValidOption && hasValidTarget;
+        });
+        
+        // Only keep conditionalLogic if there are valid conditions
+        const conditionalLogic = validConditions.length > 0 
+          ? { conditions: validConditions }
+          : undefined;
+          
+        console.log(`🧹 Cleaned conditional logic for field "${field.question}":`, {
+          originalConditions: field.conditionalLogic.conditions.length,
+          validConditions: validConditions.length,
+          removedInvalid: field.conditionalLogic.conditions.length - validConditions.length
+        });
+          
+        return { ...field, conditionalLogic };
+      }
+      return field;
+    });
+    
+    return { ...form, fields: cleanedFields };
+  };
+
   const loadForm = async (formId: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const form = await formApi.getForm(formId);
-      dispatch({ type: 'SET_CURRENT_FORM', payload: form });
+      
+      // Clean up invalid conditional logic rules
+      const cleanedForm = cleanupConditionalLogic(form);
+      
+      dispatch({ type: 'SET_CURRENT_FORM', payload: cleanedForm });
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: (error as Error).message });
     } finally {
@@ -84,29 +120,27 @@ export default function FormPreview() {
     if (errors[fieldId]) {
       setErrors(prev => ({ ...prev, [fieldId]: '' }));
     }
-
-    // Handle conditional logic for dropdown fields
-    const field = state.currentForm?.fields.find(f => f.id === fieldId);
-    if (field?.type === 'dropdown' && field.conditionalLogic && value) {
-      const matchingRule = field.conditionalLogic.conditions.find(rule => rule.answer === value);
-      if (matchingRule) {
-        console.log('Auto-navigating due to conditional logic:', matchingRule.targetSectionId);
-        // Small delay to ensure the value is set
-        setTimeout(() => {
-          handleConditionalTrigger(matchingRule.targetSectionId);
-        }, 100);
-      }
-    }
   };
 
   const handleConditionalTrigger = (targetSectionId: string) => {
-    console.log('Conditional trigger:', targetSectionId);
+    console.log('🎯 Conditional trigger called:', {
+      targetSectionId,
+      currentSectionIndex,
+      availableSections: state.currentForm?.sections?.map(s => ({ id: s.id, title: s.title })) || []
+    });
+    
     if (targetSectionId === 'end') {
+      console.log('🏁 Submitting form due to conditional logic');
       handleSubmit(new Event('submit') as any);
     } else {
       const targetIndex = state.currentForm?.sections?.findIndex(s => s.id === targetSectionId);
+      console.log('🔍 Looking for section:', { targetSectionId, targetIndex });
+      
       if (targetIndex !== undefined && targetIndex !== -1) {
+        console.log('✅ Navigating to section:', targetIndex);
         setCurrentSectionIndex(targetIndex);
+      } else {
+        console.log('❌ Target section not found:', targetSectionId);
       }
     }
   };
@@ -184,9 +218,6 @@ export default function FormPreview() {
         {currentSection.description && (
           <p className="text-gray-600 mt-2">{currentSection.description}</p>
         )}
-        <div className="text-sm text-blue-600 mt-2">
-          Section {currentSectionIndex + 1} of {state.currentForm.sections.length}
-        </div>
       </div>
     ) : null;
 
@@ -203,6 +234,7 @@ export default function FormPreview() {
               onChange={(value) => handleFieldChange(field.id, value)}
               error={errors[field.id]}
               preview={true}
+              onConditionalTrigger={handleConditionalTrigger}
             />
           ))}
         </div>
@@ -213,7 +245,13 @@ export default function FormPreview() {
     return (
       <div className="space-y-6">
         {sectionHeader}
-        <div className="grid gap-6" style={{ gridTemplateColumns: state.currentForm.columns.map(col => `${col.width}fr`).join(' ') }}>
+        <div className={`grid gap-6 ${
+          state.currentForm.columns.length === 1 
+            ? 'grid-cols-1' 
+            : state.currentForm.columns.length === 2 
+            ? 'grid-cols-1 md:grid-cols-2' 
+            : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+        }`}>
         {state.currentForm.columns.map(column => (
           <div key={column.id} className="space-y-6">
             <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">
@@ -341,18 +379,12 @@ export default function FormPreview() {
             currentSection={currentSectionIndex}
             totalSections={state.currentForm.sections.length}
             canGoNext={canProceedToNext()}
-            canGoPrevious={currentSectionIndex > 0}
             onNext={() => {
-              if (canProceedToNext()) {
+              if (canProceedToNext() && state.currentForm) {
                 const nextIndex = currentSectionIndex + 1;
                 if (nextIndex < state.currentForm.sections.length) {
                   setCurrentSectionIndex(nextIndex);
                 }
-              }
-            }}
-            onPrevious={() => {
-              if (currentSectionIndex > 0) {
-                setCurrentSectionIndex(currentSectionIndex - 1);
               }
             }}
             sectionTitles={state.currentForm.sections

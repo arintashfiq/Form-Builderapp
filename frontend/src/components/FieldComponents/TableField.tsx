@@ -45,7 +45,8 @@ export default function TableField({ field, value = [], onChange, error, preview
         {field.required && <span className="text-red-500 ml-1">*</span>}
       </label>
       
-      <div className="border rounded-md overflow-hidden">
+      {/* Desktop Table View */}
+      <div className="hidden md:block border rounded-md overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
@@ -102,6 +103,58 @@ export default function TableField({ field, value = [], onChange, error, preview
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {value.map((row, rowIndex) => (
+          <div key={rowIndex} className="border rounded-lg p-4 bg-white">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-sm font-medium text-gray-700">Row {rowIndex + 1}</h4>
+              {preview && (
+                <button
+                  type="button"
+                  onClick={() => removeRow(rowIndex)}
+                  className="text-red-600 hover:text-red-800 text-sm"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <div className="space-y-3">
+              {field.tableColumns?.map((column) => (
+                <div key={column.id}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    {column.name}
+                  </label>
+                  {column.type === 'text' ? (
+                    <input
+                      type="text"
+                      value={row[column.id] || ''}
+                      onChange={(e) => updateCell(rowIndex, column.id, e.target.value)}
+                      className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      disabled={!preview}
+                    />
+                  ) : (
+                    <select
+                      value={row[column.id] || ''}
+                      onChange={(e) => updateCell(rowIndex, column.id, e.target.value)}
+                      className="w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      disabled={!preview}
+                    >
+                      <option value="">Select</option>
+                      {column.options?.map((option, optIndex) => (
+                        <option key={optIndex} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
       
       {preview && (

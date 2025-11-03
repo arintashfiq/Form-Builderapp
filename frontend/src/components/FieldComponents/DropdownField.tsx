@@ -15,32 +15,39 @@ export default function DropdownField({ field, value = '', onChange, error, prev
     const newValue = e.target.value;
     onChange?.(newValue);
     
-    console.log('Dropdown changed:', {
+    console.log('🔽 Dropdown changed:', {
       fieldId: field.id,
       question: field.question,
       newValue,
       hasConditionalLogic: !!field.conditionalLogic,
       conditions: field.conditionalLogic?.conditions || [],
-      preview
+      preview,
+      availableOptions: field.options || [],
+      hasOnConditionalTrigger: !!onConditionalTrigger
     });
     
     // Handle conditional logic if in preview mode
     if (preview && field.conditionalLogic && newValue) {
+      // Validate that the condition exists and the answer matches exactly
       const matchingCondition = field.conditionalLogic.conditions.find(
         condition => condition.answer === newValue
       );
       
       console.log('Conditional logic check:', {
+        searchingFor: newValue,
+        availableConditions: field.conditionalLogic.conditions.map(c => c.answer),
         matchingCondition,
         hasOnConditionalTrigger: !!onConditionalTrigger
       });
       
       if (matchingCondition && onConditionalTrigger) {
-        console.log('Triggering conditional navigation to:', matchingCondition.targetSectionId);
+        console.log('✅ Triggering conditional navigation to:', matchingCondition.targetSectionId);
         // Small delay to allow the value to be set first
         setTimeout(() => {
           onConditionalTrigger(matchingCondition.targetSectionId);
         }, 100);
+      } else if (field.conditionalLogic.conditions.length > 0) {
+        console.log('❌ No matching condition found for:', newValue);
       }
     }
   };
@@ -61,7 +68,7 @@ export default function DropdownField({ field, value = '', onChange, error, prev
         {field.required && <span className="text-red-500 ml-1">*</span>}
         {field.conditionalLogic && field.conditionalLogic.conditions.length > 0 && (
           <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-            Has Logic
+            🔀 Auto-Navigation
           </span>
         )}
       </label>

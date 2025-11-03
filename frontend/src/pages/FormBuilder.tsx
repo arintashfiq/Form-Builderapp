@@ -22,6 +22,8 @@ export default function FormBuilder() {
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionTitle, setEditingSectionTitle] = useState('');
 
   useEffect(() => {
     console.log('FormBuilder useEffect - id:', id, 'currentForm:', state.currentForm?.id);
@@ -70,6 +72,37 @@ export default function FormBuilder() {
     }
   }, [state.currentForm]); // Removed formName from dependencies
 
+  const cleanupConditionalLogic = (form: Form): Form => {
+    const sectionIds = form.sections?.map(s => s.id) || [];
+    
+    const cleanedFields = form.fields.map(field => {
+      if (field.type === 'dropdown' && field.conditionalLogic && field.options) {
+        // Remove conditional rules that reference non-existent options or sections
+        const validConditions = field.conditionalLogic.conditions.filter(condition => {
+          const hasValidOption = field.options!.includes(condition.answer);
+          const hasValidTarget = condition.targetSectionId === 'end' || sectionIds.includes(condition.targetSectionId);
+          return hasValidOption && hasValidTarget;
+        });
+        
+        // Only keep conditionalLogic if there are valid conditions
+        const conditionalLogic = validConditions.length > 0 
+          ? { conditions: validConditions }
+          : undefined;
+          
+        console.log(`Cleaned conditional logic for field "${field.question}":`, {
+          originalConditions: field.conditionalLogic.conditions.length,
+          validConditions: validConditions.length,
+          removedInvalid: field.conditionalLogic.conditions.length - validConditions.length
+        });
+          
+        return { ...field, conditionalLogic };
+      }
+      return field;
+    });
+    
+    return { ...form, fields: cleanedFields };
+  };
+
   const loadForm = async (formId: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
@@ -97,8 +130,12 @@ export default function FormBuilder() {
       }
 
       console.log('FormBuilder: Final form with sections:', form.sections);
-      dispatch({ type: 'SET_CURRENT_FORM', payload: form });
-      setFormName(form.name);
+      
+      // Clean up invalid conditional logic rules
+      const cleanedForm = cleanupConditionalLogic(form);
+      
+      dispatch({ type: 'SET_CURRENT_FORM', payload: cleanedForm });
+      setFormName(cleanedForm.name);
 
       // Set active section to first section
       if (form.sections && form.sections.length > 0) {
@@ -120,11 +157,14 @@ export default function FormBuilder() {
     // Ensure form name is not empty - use fallback if needed
     const finalFormName = formName.trim() || state.currentForm.name || 'Untitled Form';
 
+    // Clean up conditional logic before saving
+    const cleanedForm = cleanupConditionalLogic(state.currentForm);
+    
     const formData = {
       name: finalFormName,
-      fields: state.currentForm.fields,
-      columns: state.currentForm.columns,
-      sections: state.currentForm.sections || [],
+      fields: cleanedForm.fields,
+      columns: cleanedForm.columns,
+      sections: cleanedForm.sections || [],
     };
 
     console.log('Saving form data:', formData);
@@ -274,6 +314,24 @@ export default function FormBuilder() {
     });
   };
 
+  const startEditingSection = (sectionId: string, currentTitle: string) => {
+    setEditingSectionId(sectionId);
+    setEditingSectionTitle(currentTitle);
+  };
+
+  const saveEditingSection = () => {
+    if (editingSectionId && editingSectionTitle.trim()) {
+      updateSection(editingSectionId, { title: editingSectionTitle.trim() });
+    }
+    setEditingSectionId(null);
+    setEditingSectionTitle('');
+  };
+
+  const cancelEditingSection = () => {
+    setEditingSectionId(null);
+    setEditingSectionTitle('');
+  };
+
   const moveField = (dragIndex: number, hoverIndex: number) => {
     if (!state.currentForm) return;
     const fields = [...state.currentForm.fields];
@@ -342,7 +400,7 @@ export default function FormBuilder() {
       <div className="lg:col-span-1">
         <div className="bg-white rounded-lg shadow-sm border p-4">
           <h3 className="text-lg font-semibold mb-4">Field Types</h3>
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 lg:grid-cols-1 gap-2 lg:space-y-2 lg:grid-cols-none">
             <button
               onClick={() => addField('text')}
               className="w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded-md transition-colors"
@@ -454,15 +512,48 @@ export default function FormBuilder() {
                 {state.currentForm.sections
                   .sort((a, b) => a.order - b.order)
                   .map((section, index) => (
-                    <button
+                    <div
                       key={section.id}
-                      onClick={() => setActiveSectionId(section.id)}
-                      className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeSectionId === section.id
+                      className={`flex items-center px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeSectionId === section.id
                         ? 'border-blue-600 text-blue-600'
                         : 'border-transparent text-gray-600 hover:text-gray-900'
                         }`}
                     >
-                      {section.title}
+                      {editingSectionId === section.id ? (
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            value={editingSectionTitle}
+                            onChange={(e) => setEditingSectionTitle(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                saveEditingSection();
+                              } else if (e.key === 'Escape') {
+                                cancelEditingSection();
+                              }
+                            }}
+                            onBlur={saveEditingSection}
+                            autoFocus
+                            className="px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setActiveSectionId(section.id)}
+                          onDoubleClick={() => startEditingSection(section.id, section.title)}
+                          className="flex items-center"
+                          title="Double-click to edit section name"
+                        >
+                          {section.title}
+                          <Settings 
+                            className="h-3 w-3 ml-1 opacity-50 hover:opacity-100" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditingSection(section.id, section.title);
+                            }}
+                          />
+                        </button>
+                      )}
                       {state.currentForm && state.currentForm.sections.length > 1 && (
                         <button
                           onClick={(e) => {
@@ -476,7 +567,7 @@ export default function FormBuilder() {
                           <Trash2 className="h-3 w-3 inline" />
                         </button>
                       )}
-                    </button>
+                    </div>
                   ))}
                 <button
                   onClick={addSection}

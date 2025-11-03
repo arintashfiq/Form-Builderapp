@@ -62,14 +62,28 @@ export default function FieldEditor({ field, onUpdate, onClose, sections = [] }:
   };
 
   const updateOption = (index: number, value: string) => {
+    const oldValue = options[index];
     const newOptions = [...options];
     newOptions[index] = value;
     setOptions(newOptions);
+    
+    // Update conditional rules that reference the old option value
+    const updatedRules = conditionalRules.map(rule => 
+      rule.answer === oldValue ? { ...rule, answer: value } : rule
+    );
+    setConditionalRules(updatedRules);
+    
     markAsChanged();
   };
 
   const removeOption = (index: number) => {
+    const removedOption = options[index];
     setOptions(options.filter((_: string, i: number) => i !== index));
+    
+    // Remove conditional rules that reference the removed option
+    const updatedRules = conditionalRules.filter(rule => rule.answer !== removedOption);
+    setConditionalRules(updatedRules);
+    
     markAsChanged();
   };
 

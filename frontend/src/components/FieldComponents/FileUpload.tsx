@@ -61,15 +61,17 @@ export default function FileUpload({ field, value = [], onChange, error, preview
       
       {preview && (
         <div
-          className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
+          className="border-2 border-dashed border-gray-300 rounded-lg p-4 md:p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
           onClick={() => fileInputRef.current?.click()}
         >
-          <Upload className="mx-auto h-12 w-12 text-gray-400" />
+          <Upload className="mx-auto h-8 w-8 md:h-12 md:w-12 text-gray-400" />
           <p className="mt-2 text-sm text-gray-600">
-            Click to upload files or drag and drop
+            <span className="hidden sm:inline">Click to upload files or drag and drop</span>
+            <span className="sm:hidden">Tap to upload files</span>
           </p>
-          <p className="text-xs text-gray-500">
-            Supported: PDF, DOC, DOCX, JPG, PNG, GIF, TXT (Max 10MB)
+          <p className="text-xs text-gray-500 mt-1">
+            <span className="hidden sm:inline">Supported: PDF, DOC, DOCX, JPG, PNG, GIF, TXT (Max 10MB)</span>
+            <span className="sm:hidden">PDF, DOC, JPG, PNG, TXT (Max 10MB)</span>
           </p>
         </div>
       )}
@@ -89,15 +91,15 @@ export default function FileUpload({ field, value = [], onChange, error, preview
           <p className="text-sm font-medium text-gray-700">Uploaded Files:</p>
           {value.map((file, index) => (
             <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-              <div className="flex items-center space-x-2">
-                <File className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-gray-700">{file.originalName}</span>
+              <div className="flex items-center space-x-2 min-w-0 flex-1">
+                <File className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                <span className="text-sm text-gray-700 truncate">{file.originalName}</span>
               </div>
               {preview && (
                 <button
                   type="button"
                   onClick={() => removeFile(index)}
-                  className="text-red-600 hover:text-red-800"
+                  className="text-red-600 hover:text-red-800 ml-2 flex-shrink-0"
                 >
                   <X className="h-4 w-4" />
                 </button>
