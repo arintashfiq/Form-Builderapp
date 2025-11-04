@@ -37,7 +37,7 @@ export default function DropZoneColumn({
     >
       <div className="font-medium">{column.name}</div>
       <div className="text-xs text-gray-600">
-        {column.width}% • {fieldsInColumn} field{fieldsInColumn !== 1 ? 's' : ''}
+        {fieldsInColumn} field{fieldsInColumn !== 1 ? 's' : ''}
       </div>
       {isOver && (
         <div className="text-xs text-blue-600 mt-1">

@@ -11,10 +11,9 @@ interface ColumnEditorProps {
 
 export default function ColumnEditor({ column, onUpdate, onClose, onDelete }: ColumnEditorProps) {
   const [name, setName] = useState(column.name);
-  const [width, setWidth] = useState(column.width);
 
   const handleSave = () => {
-    onUpdate({ name, width });
+    onUpdate({ name });
   };
 
   const handleDelete = () => {
@@ -54,23 +53,7 @@ export default function ColumnEditor({ column, onUpdate, onClose, onDelete }: Co
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Width (%)
-          </label>
-          <input
-            type="number"
-            value={width}
-            onChange={(e) => setWidth(parseInt(e.target.value) || 0)}
-            onBlur={handleSave}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            min="10"
-            max="100"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Column width as percentage of total form width
-          </p>
-        </div>
+
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">

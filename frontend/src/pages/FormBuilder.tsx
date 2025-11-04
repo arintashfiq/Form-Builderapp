@@ -245,7 +245,7 @@ export default function FormBuilder() {
     const newColumn: FormColumn = {
       id: uuidv4(),
       name: 'New Column',
-      width: 50,
+      width: 100, // Fixed width - not user configurable
       fieldIds: [],
     };
     dispatch({ type: 'ADD_COLUMN', payload: newColumn });
@@ -649,7 +649,7 @@ export default function FormBuilder() {
                     return (
                       <div key={column.id} className="border-2 border-dashed border-blue-200 rounded-lg p-4">
                         <h4 className="text-sm font-semibold text-blue-700 mb-3 flex items-center">
-                          📋 {column.name} ({column.width}%)
+                          📋 {column.name}
                           <span className="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
                             {fieldsInColumn.length} field{fieldsInColumn.length !== 1 ? 's' : ''}
                           </span>

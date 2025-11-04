@@ -84,7 +84,37 @@ export default function FormPreview() {
 
     const newErrors: Record<string, string> = {};
 
-    state.currentForm.fields.forEach(field => {
+    // Only validate fields in sections that the user has visited (allowedSections)
+    const fieldsToValidate = state.currentForm.fields.filter(field => {
+      // If field has no sectionId, validate it (backward compatibility)
+      if (!field.sectionId) return true;
+      
+      // Only validate fields in sections the user has visited
+      return allowedSections.has(field.sectionId);
+    });
+
+    console.log('🔍 Form validation:', {
+      totalFields: state.currentForm.fields.length,
+      fieldsToValidate: fieldsToValidate.length,
+      allowedSections: Array.from(allowedSections),
+      skippedFields: state.currentForm.fields.length - fieldsToValidate.length,
+      fieldsToValidateDetails: fieldsToValidate.map(f => ({ 
+        id: f.id, 
+        question: f.question, 
+        sectionId: f.sectionId, 
+        required: f.required 
+      })),
+      skippedFieldsDetails: state.currentForm.fields
+        .filter(f => f.sectionId && !allowedSections.has(f.sectionId))
+        .map(f => ({ 
+          id: f.id, 
+          question: f.question, 
+          sectionId: f.sectionId, 
+          required: f.required 
+        }))
+    });
+
+    fieldsToValidate.forEach(field => {
       const value = formData[field.id];
 
       if (field.required && (!value || (Array.isArray(value) && value.length === 0))) {
